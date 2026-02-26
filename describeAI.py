@@ -7,12 +7,12 @@ from mlx_vlm import load, generate
 from mlx_vlm.prompt_utils import apply_chat_template
 from mlx_vlm.utils import load_config
 
-def format_timestamp(seconds: int) -> str:
-    """Format seconds into [HHH:MM:SS] timestamp."""
+def format_timestamp(seconds: int, milliseconds: int = 0) -> str:
+    """Format seconds and milliseconds into HH:MM:SS.mmm timestamp format."""
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
-    return f"[{h:03d}:{m:02d}:{s:02d}]"
+    return f"{h:03d}:{m:02d}:{s:02d}.{milliseconds:03d}"
 
 def main(folder_path: str):
     start_time = time.perf_counter()
@@ -66,7 +66,7 @@ def main(folder_path: str):
             print(f"  Processing frame {i}/{len(frames_list)}: {img_path.name}")
             output = generate(model, processor, prompt, str(img_path), max_tokens=100, verbose=False)
             ts_sec = frame_num - 1
-            ts_key = format_timestamp(ts_sec)
+            ts_key = format_timestamp(ts_sec, 0)
             desc_dict[ts_key] = output.text.strip()
         
         # Save per-video JSON

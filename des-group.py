@@ -22,7 +22,7 @@ from difflib import SequenceMatcher
 from typing import Dict, List, Tuple, Optional
 
 
-def are_similar(a: str, b: str, threshold: float = 0.6) -> bool:
+def are_similar(a: str, b: str, threshold: float = 0.75) -> bool:
     """
     Determine if two descriptions are semantically similar.
     
