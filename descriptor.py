@@ -27,17 +27,21 @@ from pathlib import Path
 def run_command(cmd, description):
     """Run a command and return success status with status updates."""
     print(f"Running: {description}")
+    start_time = time.time()
     try:
         result = subprocess.run(cmd, shell=True, check=True, 
                               capture_output=True, text=True)
-        print(f"✓ {description} completed successfully")
+        elapsed_time = time.time() - start_time
+        print(f"✓ {description} completed successfully ({elapsed_time:.1f}s)")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"✗ {description} failed")
+        elapsed_time = time.time() - start_time
+        print(f"✗ {description} failed ({elapsed_time:.1f}s)")
         print(f"Error: {e.stderr}")
         return False
     except Exception as e:
-        print(f"✗ {description} failed with exception: {e}")
+        elapsed_time = time.time() - start_time
+        print(f"✗ {description} failed with exception: {e} ({elapsed_time:.1f}s)")
         return False
 
 
@@ -81,14 +85,20 @@ def main():
     print("=" * 60)
     
     # Step 1: Extract frames
-    print("\n1/4 - Extracting frames from videos...")
+    print("\n1/5 - Extracting frames from videos...")
     success = run_command(f"python3 frame-extractor.py {directory}", "Frame extraction")
     if not success:
         print("Pipeline stopped due to frame extraction failure.")
         sys.exit(1)
     
-    # Step 2: Generate descriptions
-    print("\n2/4 - Generating AI descriptions for frames...")
+    # Step 2: Extract scenes
+    print("\n2/5 - Extracting scene changes from videos...")
+    success = run_command(f"python3 scene-extractor.py {directory}", "Scene extraction")
+    if not success:
+        print("Warning: Scene extraction failed, but continuing pipeline...")
+    
+    # Step 3: Generate descriptions
+    print("\n3/5 - Generating AI descriptions for frames...")
     video_folders = find_video_folders(directory)
     
     if not video_folders:
@@ -107,17 +117,17 @@ def main():
         print("Pipeline stopped due to description generation failure.")
         sys.exit(1)
     
-    # Step 3: Group descriptions
-    print("\n3/4 - Grouping similar descriptions...")
+    # Step 4: Group descriptions
+    print("\n4/5 - Grouping similar descriptions...")
     success = run_command(f"python3 des-group.py {directory}", "Description grouping")
     if not success:
         print("Pipeline stopped due to description grouping failure.")
         sys.exit(1)
     
-    # Step 4: Clean up temporary files
-    print("\n4/4 - Cleaning up temporary files...")
+    # Step 5: Clean up temporary files
+    print("\n5/5 - Cleaning up temporary files...")
     print("  Keeping: *.descriptions.json files")
-    print("  Deleting: frames folders and *.description.json files")
+    print("  Deleting: frames folders and *.description.json files\n")
     
     # Run clear-files.py to delete frames and .description.json files, keeping .descriptions.json
     success = run_command(f"python3 clear-files.py description {directory}", "Cleanup - removing .description.json files")
@@ -128,10 +138,15 @@ def main():
     success = run_command(f"python3 clear-files.py frames {directory}", "Cleanup - removing frames directories")
     if not success:
         print("Warning: Failed to clean up frames directories")
+
+    # Delete scenes 
+    success = run_command(f"python3 clear-files.py scenes {directory}", "Cleanup - removing *.scene.json files ")
+    if not success:
+        print("Warning: Failed to clean up *.scene.json files")
     
     print("\n" + "=" * 60)
     print("✓ Pipeline completed successfully!")
-    print("Final output: *.descriptions.json files with grouped descriptions")
+    print("Final output: *.descriptions.json files with grouped descriptions and scene data")
     print("=" * 60)
 
 

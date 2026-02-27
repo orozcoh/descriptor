@@ -3,10 +3,11 @@
 Clear script files - Delete frames folders and description files created by video processing scripts.
 
 Usage:
-    python clear-script-files.py                    # clears frames folders and .description.json files (default)
+    python clear-script-files.py                    # clears frames folders, .description.json, and .scene.json files (default)
     python clear-script-files.py frames             # clears only frames folders
     python clear-script-files.py description        # clears only .description.json files
     python clear-script-files.py descriptions       # clears only .descriptions.json files
+    python clear-script-files.py scenes             # clears only .scene.json files
     python clear-script-files.py purge              # clears everything with confirmation
     python clear-script-files.py <func> <path>      # run any function on a specific directory path
 
@@ -14,6 +15,7 @@ Examples:
     python clear-script-files.py purge              # clear everything in current directory
     python clear-script-files.py frames /path/to/folder  # clear frames in specific folder
     python clear-script-files.py description content/2026/26-week-1-2  # clear descriptions in specific folder
+    python clear-script-files.py scenes content/2026/26-week-1-2  # clear scene files in specific folder
 """
 
 import os
@@ -84,6 +86,7 @@ def confirm_purge_operation(root_path: Path) -> bool:
     print("  - All 'frames' directories and their contents")
     print("  - All '*.description.json' files")
     print("  - All '*.descriptions.json' files")
+    print("  - All '*.scene.json' files")
     print()
     
     response = input("Are you sure you want to continue? (yes/no): ").strip().lower()
@@ -100,8 +103,8 @@ def main():
     parser.add_argument(
         'function',
         nargs='?',
-        choices=['frames', 'description', 'descriptions', 'purge'],
-        help='Type of files to delete (default: frames + description)'
+        choices=['frames', 'description', 'descriptions', 'scenes', 'purge'],
+        help='Type of files to delete (default: frames + description + scenes)'
     )
     
     parser.add_argument(
@@ -138,6 +141,7 @@ def main():
         frames_dirs = find_frames_directories(root_path)
         description_files = find_description_files(root_path, "*.description.json")
         descriptions_files = find_description_files(root_path, "*.descriptions.json")
+        scene_files = find_description_files(root_path, "*.scene.json")
         
         # Delete everything
         total_deleted = 0
@@ -155,6 +159,11 @@ def main():
         
         if descriptions_files:
             count, errors = delete_files(descriptions_files)
+            total_deleted += count
+            all_errors.extend(errors)
+        
+        if scene_files:
+            count, errors = delete_files(scene_files)
             total_deleted += count
             all_errors.extend(errors)
         
@@ -179,6 +188,7 @@ def main():
         delete_frames = args.function == 'frames' or args.function is None
         delete_descriptions = args.function == 'description' or args.function is None
         delete_descriptions_only = args.function == 'descriptions'
+        delete_scenes = args.function == 'scenes' or args.function is None
         
         if delete_frames:
             frames_dirs = find_frames_directories(root_path)
@@ -209,6 +219,16 @@ def main():
                 all_errors.extend(errors)
             else:
                 print("No .descriptions.json files found.")
+        
+        if delete_scenes:
+            scene_files = find_description_files(root_path, "*.scene.json")
+            if scene_files:
+                print("Deleting .scene.json files...")
+                count, errors = delete_files(scene_files)
+                total_deleted += count
+                all_errors.extend(errors)
+            elif args.function == 'scenes':
+                print("No .scene.json files found.")
         
         # Summary for non-purge operations
         if total_deleted > 0:

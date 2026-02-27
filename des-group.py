@@ -162,9 +162,42 @@ def is_video_description_file(file_path: Path) -> bool:
     return filename.startswith("VID_")
 
 
+def load_scene_data(video_path: Path) -> Optional[Dict]:
+    """
+    Load scene data from the corresponding .scene.json file.
+    
+    Args:
+        video_path (Path): Path to the video file (used to find corresponding scene file)
+    
+    Returns:
+        Optional[Dict]: Scene data if found, None if file doesn't exist or can't be loaded
+    """
+    # Create scene file path with same base name as video
+    # Remove .description from the stem if it exists to get the correct video name
+    video_stem = video_path.stem
+    if video_stem.endswith('.description'):
+        video_stem = video_stem.replace('.description', '')
+    scene_filename = video_stem + '.scene.json'
+    scene_path = video_path.parent / scene_filename
+    
+    print(f"  Debug: Looking for scene file at: {scene_path}")
+    print(f"  Debug: Scene file exists: {scene_path.exists()}")
+    
+    if not scene_path.exists():
+        return None
+    
+    try:
+        with open(scene_path, 'r', encoding='utf-8') as f:
+            scene_data = json.load(f)
+        return scene_data
+    except Exception as e:
+        print(f"  Warning: Could not load scene data from {scene_filename}: {e}")
+        return None
+
+
 def process_description_file(file_path: Path, threshold: float = 0.8) -> Optional[Path]:
     """
-    Process a single description JSON file and create grouped output.
+    Process a single description JSON file and create grouped output with merged scene data.
     
     Args:
         file_path (Path): Path to the input description JSON file
@@ -198,16 +231,34 @@ def process_description_file(file_path: Path, threshold: float = 0.8) -> Optiona
         # Group the descriptions using semantic similarity
         grouped_timeline = collapse_noisy_json(descriptions, threshold)
         
+        # Load corresponding scene data
+        scene_data = load_scene_data(file_path)
+        
+        # If no scene data exists, skip this file (as requested)
+        if scene_data is None:
+            print(f"  Skipping {file_path.name} - no corresponding scene file found")
+            return None
+        
+        # Create the merged output structure
+        merged_output = {
+            "timestamps": grouped_timeline,
+            "scenes-info": {
+                "scene_threshold": scene_data.get("scene_threshold", 0.4),
+                "total_scenes": scene_data.get("total_scenes", 0),
+                "scenes": scene_data.get("scenes", [])
+            }
+        }
+        
         # Create output file path with .descriptions.json extension
         # Remove .description from the filename before adding .descriptions.json
         output_filename = file_path.stem.replace('.description', '') + '.descriptions.json'
         output_path = file_path.parent / output_filename
         
-        # Save the grouped timeline to output file
+        # Save the merged output to file
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(grouped_timeline, f, indent=2, ensure_ascii=False)
+            json.dump(merged_output, f, indent=2, ensure_ascii=False)
         
-        print(f"  ✓ Created: {output_path.name}")
+        print(f"  ✓ Created: {output_path.name} (with scene data)")
         return output_path
         
     except json.JSONDecodeError as e:
@@ -251,6 +302,21 @@ def create_folder_summary(folder: Path, video_jsons: dict):
     with open(summary_path, 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     print(f"\nFolder summary saved: {summary_path}")
+
+
+def create_folder_descriptions_summary(folder: Path, grouped_descriptions: dict):
+    """
+    Create a folder summary JSON file from grouped video descriptions.
+    
+    Args:
+        folder (Path): Path to the folder containing the videos
+        grouped_descriptions (dict): Dictionary of grouped video descriptions
+    """
+    summary = {"folder": folder.name, "videos": grouped_descriptions}
+    summary_path = folder / f"{folder.name}.descriptions.json"
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False)
+    print(f"\nFolder descriptions summary saved: {summary_path}")
 
 
 def main():
@@ -316,6 +382,7 @@ def main():
     # Process each description file
     processed_count = 0
     failed_count = 0
+    grouped_descriptions = {}
     
     for file_path in sorted(description_files):
         print(f"Processing: {file_path.name}")
@@ -323,9 +390,22 @@ def main():
         result = process_description_file(file_path, args.threshold)
         if result:
             processed_count += 1
+            # Extract video stem from the output filename for the summary
+            video_stem = result.stem.replace('.descriptions', '')
+            # Read the grouped descriptions to include in folder summary
+            try:
+                with open(result, 'r', encoding='utf-8') as f:
+                    grouped_descriptions[video_stem] = json.load(f)
+            except Exception as e:
+                print(f"  Warning: Could not read grouped descriptions for summary: {e}")
         else:
             failed_count += 1
         print()
+    
+    # Create folder summary if we have any successful processing
+    if processed_count > 0:
+        print("Creating folder summary...")
+        create_folder_descriptions_summary(input_dir, grouped_descriptions)
     
     # Calculate and display execution time
     end_time = time.perf_counter()
