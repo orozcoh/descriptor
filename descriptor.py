@@ -22,6 +22,7 @@ import subprocess
 import argparse
 import time
 from pathlib import Path
+from scripts.describeAI import load_model_and_prompt, process_video_frames
 
 
 def run_command(cmd, description, cwd=None):
@@ -129,13 +130,21 @@ def main():
         print("No video folders found for description generation.")
         descriptions_success = True
     else:
+        # Load model once for all folders
+        model, processor, prompt = load_model_and_prompt(verbose=False)
+        
         descriptions_success = True
-        for i, folder in enumerate(video_folders, 1):
-            print(f"  Processing folder {i}/{len(video_folders)}: {folder.name}")
-            success = run_command(f'python3 scripts/describeAI.py "{folder}"', f"Description generation for {folder.name}", cwd=project_root)
-            if not success:
+        total_folders = len(video_folders)
+        for i, folder_path in enumerate(video_folders, 1):
+            print(f"  Processing folder {i}/{total_folders}: {folder_path.name}")
+            folder_start = time.time()
+            success = process_video_frames(folder_path, model, processor, prompt, verbose=False)
+            folder_elapsed = time.time() - folder_start
+            if success:
+                print(f"  ✓ Description generation for {folder_path.name} completed successfully ({folder_elapsed:.1f}s)")
+            else:
                 descriptions_success = False
-                print(f"  Warning: Failed to process {folder.name}")
+                print(f"  ✗ Description generation for {folder_path.name} failed ({folder_elapsed:.1f}s)")
     
     if not descriptions_success:
         print("Pipeline stopped due to description generation failure.")
@@ -150,11 +159,9 @@ def main():
     
     # Step 5: Clean up temporary files
     print("\n5/5 - Cleaning up temporary files...")
-    print("  Keeping: *.descriptions.json files")
-    print("  Deleting: frames folders and *.description.json files\n")
     
     # Run clear-files.py to delete frames and .description.json files, keeping .descriptions.json
-    success = run_command(f'python3 scripts/clear-files.py "{directory}"', "Cleanup - removing frames folder, .description.json, .scene.json files (verbose)", cwd=project_root)
+    success = run_command(f'python3 scripts/clear-files.py "{directory}"', "Cleanup temp files", cwd=project_root)
     if not success:
         print("Warning: Failed to clean up .description.json files")
     

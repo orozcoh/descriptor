@@ -7,6 +7,8 @@ from collections import defaultdict
 from mlx_vlm import load, generate
 from mlx_vlm.prompt_utils import apply_chat_template
 from mlx_vlm.utils import load_config
+import os
+from huggingface_hub import snapshot_download
 
 # ANSI escape codes for terminal control
 CLEAR_LINE = '\033[K'  # Clear from cursor to end of line
@@ -27,26 +29,58 @@ def print_progress_bar(current, total, bar_width=20):
     sys.stdout.flush()
 
 
-def format_timestamp(seconds: int, milliseconds: int = 0) -> str:
-    """Format seconds and milliseconds into HH:MM:SS.mmm timestamp format."""
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    return f"{h:03d}:{m:02d}:{s:02d}.{milliseconds:03d}"
+def load_model_and_prompt(verbose: bool = False):
+    """Load model, processor, config, and prompt once."""
+    # Model loading with progress suppression after first download
+    model_id = "apple/FastVLM-0.5B"
+    flag_dir = Path.home() / ".descriptor"
+    flag_file = flag_dir / "fastvlm_loaded"
+    first_load = not flag_file.exists()
 
-def main(folder_path: str, verbose: bool = False):
-    start_time = time.perf_counter()
-    folder = Path(folder_path)
-    frames_dir = folder / "frames"
+    if verbose:
+        if first_load:
+            print("Loading model (first time - downloading)...")
+        else:
+            print("Loading model...")
+    elif not first_load:
+        print("FastVLM Model Loaded successfully")
+
+    if first_load:
+        model_path = model_id
+        config_path = model_id
+    else:
+        os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
+        model_path = snapshot_download(model_id, local_files_only=True)
+        config_path = snapshot_download(model_id, local_files_only=True)
+
+    model, processor = load(model_path)
+    config = load_config(config_path)
+    prompt = apply_chat_template(processor, config, "Describe this image in no more than 150 characters", num_images=1)
+
+    # Create flag after successful first load
+    if first_load:
+        flag_dir.mkdir(exist_ok=True)
+        flag_file.touch()
+        if verbose:
+            print("FastVLM model downloaded and ready.")
+
+    return model, processor, prompt
+
+
+def process_video_frames(folder_path: Path, model, processor, prompt, verbose: bool = False):
+    """Process frames in a single video folder and save descriptions."""
+    frames_dir = folder_path / "frames"
     
     if not frames_dir.exists():
-        print(f"Error: No 'frames' directory found in {folder}")
-        return 1
+        if verbose:
+            print(f"Error: No 'frames' directory found in {folder_path}")
+        return False
     
     pngs = list(frames_dir.glob("*.png"))
     if not pngs:
-        print("No PNG frames found in frames directory.")
-        return 1
+        if verbose:
+            print("No PNG frames found in frames directory.")
+        return False
     
     # Group frames by video stem: VID_xxx
     groups = defaultdict(list)
@@ -67,15 +101,9 @@ def main(folder_path: str, verbose: bool = False):
             continue
     
     if not groups:
-        print("No valid video frame groups found.")
-        return 1
-    
-    # Load model once
-    if verbose:
-        print("Loading model...")
-    model, processor = load("apple/FastVLM-0.5B")
-    config = load_config("apple/FastVLM-0.5B")
-    prompt = apply_chat_template(processor, config, "Describe this image in no more than 150 characters", num_images=1)
+        if verbose:
+            print("No valid video frame groups found.")
+        return False
     
     video_jsons = {}
     total_frames = sum(len(frames) for frames in groups.values())
@@ -104,25 +132,41 @@ def main(folder_path: str, verbose: bool = False):
                 print_progress_bar(current_frame, total_frames)
         
         # Save per-video JSON
-        json_path = folder / f"{video_stem}.description.json"
+        json_path = folder_path / f"{video_stem}.description.json"
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(desc_dict, f, indent=2, ensure_ascii=False)
         video_jsons[video_stem] = desc_dict
         if verbose:
             print(f"  Saved: {json_path}")
     
-    # Clear the progress line and show final result
+    # Clear the progress line
     if not verbose:
         sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
         sys.stdout.flush()
     
+    return True
+
+
+def format_timestamp(seconds: int, milliseconds: int = 0) -> str:
+    """Format seconds and milliseconds into HH:MM:SS.mmm timestamp format."""
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:03d}:{m:02d}:{s:02d}.{milliseconds:03d}"
+
+
+def main(folder_path: str, verbose: bool = False):
+    start_time = time.perf_counter()
+    folder = Path(folder_path)
+    model, processor, prompt = load_model_and_prompt(verbose)
+    success = process_video_frames(folder, model, processor, prompt, verbose)
     end_time = time.perf_counter()
     total_time = end_time - start_time
     if verbose:
         print(f"\nAll done! Total generation time: {total_time:.2f} seconds")
     else:
         print(f"Processing complete! Total generation time: {total_time:.2f} seconds")
-    return 0
+    return 0 if success else 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate timestamped descriptions for video frames and folder summary.")

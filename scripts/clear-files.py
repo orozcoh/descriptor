@@ -232,7 +232,6 @@ def main():
         
         # Preserve *.descriptions.json files - confirm and report
         preserve_files = find_description_files(root_path, "*.descriptions.json")
-        print(f"Preserving {len(preserve_files)} *.descriptions.json file(s)")
         
         if delete_frames:
             frames_dirs = find_frames_directories(root_path)
