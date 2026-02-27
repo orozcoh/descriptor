@@ -24,14 +24,14 @@ import time
 from pathlib import Path
 
 
-def run_command(cmd, description):
+def run_command(cmd, description, cwd=None):
     """Run a command and return success status with status updates."""
     print(f"Running: {description}")
     start_time = time.time()
     try:
         # Run the command and show output in real-time
         result = subprocess.run(cmd, shell=True, check=True, 
-                              text=True)
+                              text=True, cwd=cwd)
         elapsed_time = time.time() - start_time
         print(f"✓ {description} completed successfully ({elapsed_time:.1f}s)")
         return True
@@ -46,14 +46,14 @@ def run_command(cmd, description):
         return False
 
 
-def run_command_silent(cmd, description):
+def run_command_silent(cmd, description, cwd=None):
     """Run a command silently and return success status with status updates."""
     print(f"Running: {description}")
     start_time = time.time()
     try:
         # Run the command with output suppressed
         result = subprocess.run(cmd, shell=True, check=True, 
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, cwd=cwd)
         elapsed_time = time.time() - start_time
         print(f"✓ {description} completed successfully ({elapsed_time:.1f}s)")
         return True
@@ -95,6 +95,7 @@ def main():
     
     args = parser.parse_args()
     directory = os.path.abspath(args.directory)
+    project_root = os.path.dirname(os.path.abspath(__file__))
     
     if not os.path.exists(directory):
         print(f"Error: Directory '{directory}' does not exist.")
@@ -109,14 +110,14 @@ def main():
     
     # Step 1: Extract frames
     print("\n1/5 - Extracting frames from videos...")
-    success = run_command(f"python3 scripts/frame-extractor.py {directory}", "Frame extraction")
+    success = run_command(f"python3 scripts/frame-extractor.py {directory}", "Frame extraction", cwd=project_root)
     if not success:
         print("Pipeline stopped due to frame extraction failure.")
         sys.exit(1)
     
     # Step 2: Extract scenes
     print("\n2/5 - Extracting scene changes from videos...")
-    success = run_command(f"python3 scripts/scene-extractor.py {directory}", "Scene extraction")
+    success = run_command(f"python3 scripts/scene-extractor.py {directory}", "Scene extraction", cwd=project_root)
     if not success:
         print("Warning: Scene extraction failed, but continuing pipeline...")
     
@@ -131,7 +132,7 @@ def main():
         descriptions_success = True
         for i, folder in enumerate(video_folders, 1):
             print(f"  Processing folder {i}/{len(video_folders)}: {folder.name}")
-            success = run_command(f"python3 scripts/describeAI.py {folder}", f"Description generation for {folder.name}")
+            success = run_command(f"python3 scripts/describeAI.py {folder}", f"Description generation for {folder.name}", cwd=project_root)
             if not success:
                 descriptions_success = False
                 print(f"  Warning: Failed to process {folder.name}")
@@ -142,7 +143,7 @@ def main():
     
     # Step 4: Group descriptions
     print("\n4/5 - Grouping similar descriptions...")
-    success = run_command(f"python3 scripts/des-group.py {directory}", "Description grouping")
+    success = run_command(f"python3 scripts/des-group.py {directory}", "Description grouping", cwd=project_root)
     if not success:
         print("Pipeline stopped due to description grouping failure.")
         sys.exit(1)
@@ -153,7 +154,7 @@ def main():
     print("  Deleting: frames folders and *.description.json files\n")
     
     # Run clear-files.py to delete frames and .description.json files, keeping .descriptions.json
-    success = run_command_silent(f"python3 scripts/clear-files.py {directory}", "Cleanup - removing frames folder, .description.json, .scene.json files")
+    success = run_command_silent(f"python3 scripts/clear-files.py {directory}", "Cleanup - removing frames folder, .description.json, .scene.json files", cwd=project_root)
     if not success:
         print("Warning: Failed to clean up .description.json files")
     

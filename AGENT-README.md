@@ -23,8 +23,14 @@ A sophisticated video processing pipeline that transforms raw video files into s
 
 Install descriptor system-wide with a single curl command:
 
+**One-command install:**
 ```bash
 curl -sSL https://github.com/orozcoh/descriptor/main/install/curl-install.sh | bash
+```
+
+**One-command uninstall:**
+```bash
+curl -sSL https://github.com/orozcoh/descriptor/main/install/curl-uninstall.sh | bash
 ```
 
 After installation, use descriptor from any directory:

@@ -13,6 +13,11 @@ AI-powered pipeline that extracts frames from videos, detects scenes, generates 
 curl -sSL https://github.com/orozcoh/descriptor/main/install/curl-install.sh | bash
 ```
 
+**One-command uninstall:**
+```bash
+curl -sSL https://github.com/orozcoh/descriptor/main/install/curl-uninstall.sh | bash
+```
+
 **Use:**
 ```bash
 descriptor .                    # Current directory

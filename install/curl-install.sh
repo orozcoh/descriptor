@@ -14,9 +14,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-GITHUB_REPO="yourusername/descriptor"
+GITHUB_REPO="orozcoh/descriptor"
 INSTALL_DIR="$HOME/descriptor"
-INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/$GITHUB_REPO/main/install.sh"
+INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/$GITHUB_REPO/main/install/install.sh"
 
 # Logging function
 log_info() {
