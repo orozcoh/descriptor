@@ -29,6 +29,29 @@ def run_command(cmd, description):
     print(f"Running: {description}")
     start_time = time.time()
     try:
+        # Run the command and show output in real-time
+        result = subprocess.run(cmd, shell=True, check=True, 
+                              text=True)
+        elapsed_time = time.time() - start_time
+        print(f"✓ {description} completed successfully ({elapsed_time:.1f}s)")
+        return True
+    except subprocess.CalledProcessError as e:
+        elapsed_time = time.time() - start_time
+        print(f"✗ {description} failed ({elapsed_time:.1f}s)")
+        print(f"Error: {e.stderr}")
+        return False
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        print(f"✗ {description} failed with exception: {e} ({elapsed_time:.1f}s)")
+        return False
+
+
+def run_command_silent(cmd, description):
+    """Run a command silently and return success status with status updates."""
+    print(f"Running: {description}")
+    start_time = time.time()
+    try:
+        # Run the command with output suppressed
         result = subprocess.run(cmd, shell=True, check=True, 
                               capture_output=True, text=True)
         elapsed_time = time.time() - start_time
@@ -130,19 +153,9 @@ def main():
     print("  Deleting: frames folders and *.description.json files\n")
     
     # Run clear-files.py to delete frames and .description.json files, keeping .descriptions.json
-    success = run_command(f"python3 clear-files.py description {directory}", "Cleanup - removing .description.json files")
+    success = run_command_silent(f"python3 clear-files.py {directory}", "Cleanup - removing frames folder, .description.json, .scene.json files")
     if not success:
         print("Warning: Failed to clean up .description.json files")
-    
-    # Delete frames directories
-    success = run_command(f"python3 clear-files.py frames {directory}", "Cleanup - removing frames directories")
-    if not success:
-        print("Warning: Failed to clean up frames directories")
-
-    # Delete scenes 
-    success = run_command(f"python3 clear-files.py scenes {directory}", "Cleanup - removing *.scene.json files ")
-    if not success:
-        print("Warning: Failed to clean up *.scene.json files")
     
     print("\n" + "=" * 60)
     print("✓ Pipeline completed successfully!")

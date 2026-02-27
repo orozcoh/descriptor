@@ -21,6 +21,11 @@ from pathlib import Path
 from difflib import SequenceMatcher
 from typing import Dict, List, Tuple, Optional
 
+# ANSI escape codes for terminal control
+CLEAR_LINE = '\033[K'  # Clear from cursor to end of line
+CURSOR_UP = '\033[1A'   # Move cursor up one line
+CURSOR_DOWN = '\033[1B' # Move cursor down one line
+
 
 def are_similar(a: str, b: str, threshold: float = 0.75) -> bool:
     """
@@ -180,8 +185,6 @@ def load_scene_data(video_path: Path) -> Optional[Dict]:
     scene_filename = video_stem + '.scene.json'
     scene_path = video_path.parent / scene_filename
     
-    print(f"  Debug: Looking for scene file at: {scene_path}")
-    print(f"  Debug: Scene file exists: {scene_path.exists()}")
     
     if not scene_path.exists():
         return None
@@ -195,13 +198,28 @@ def load_scene_data(video_path: Path) -> Optional[Dict]:
         return None
 
 
-def process_description_file(file_path: Path, threshold: float = 0.8) -> Optional[Path]:
+def print_progress_bar(current, total, bar_width=20):
+    """Print a progress bar that updates in place."""
+    if total == 0:
+        return
+    
+    percent = (current / total) * 100
+    filled_width = int(bar_width * current // total)
+    bar = '█' * filled_width + '░' * (bar_width - filled_width)
+    
+    # Use \r to return cursor to beginning of line and \033[K to clear the rest of the line
+    sys.stdout.write(f'\rProgress: {percent:3.0f}% [{bar}] {current}/{total} files\033[K')
+    sys.stdout.flush()
+
+
+def process_description_file(file_path: Path, threshold: float = 0.8, verbose: bool = False) -> Optional[Path]:
     """
     Process a single description JSON file and create grouped output with merged scene data.
     
     Args:
         file_path (Path): Path to the input description JSON file
         threshold (float): Similarity threshold for grouping
+        verbose (bool): Whether to print detailed output
     
     Returns:
         Optional[Path]: Path to the created output file, or None if processing failed
@@ -222,10 +240,12 @@ def process_description_file(file_path: Path, threshold: float = 0.8) -> Optiona
                 # Direct description dictionary: {"000:00:00.000": "description", ...}
                 descriptions = data
             else:
-                print(f"  Warning: Unknown JSON structure in {file_path.name}, skipping")
+                if verbose:
+                    print(f"  Warning: Unknown JSON structure in {file_path.name}, skipping")
                 return None
         else:
-            print(f"  Warning: Invalid JSON structure in {file_path.name}, skipping")
+            if verbose:
+                print(f"  Warning: Invalid JSON structure in {file_path.name}, skipping")
             return None
         
         # Group the descriptions using semantic similarity
@@ -236,7 +256,8 @@ def process_description_file(file_path: Path, threshold: float = 0.8) -> Optiona
         
         # If no scene data exists, skip this file (as requested)
         if scene_data is None:
-            print(f"  Skipping {file_path.name} - no corresponding scene file found")
+            if verbose:
+                print(f"  Skipping {file_path.name} - no corresponding scene file found")
             return None
         
         # Create the merged output structure
@@ -258,14 +279,17 @@ def process_description_file(file_path: Path, threshold: float = 0.8) -> Optiona
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(merged_output, f, indent=2, ensure_ascii=False)
         
-        print(f"  ✓ Created: {output_path.name} (with scene data)")
+        if verbose:
+            print(f"  ✓ Created: {output_path.name} (with scene data)")
         return output_path
         
     except json.JSONDecodeError as e:
-        print(f"  Error: Invalid JSON in {file_path.name}: {e}")
+        if verbose:
+            print(f"  Error: Invalid JSON in {file_path.name}: {e}")
         return None
     except Exception as e:
-        print(f"  Error processing {file_path.name}: {e}")
+        if verbose:
+            print(f"  Error processing {file_path.name}: {e}")
         return None
 
 
@@ -342,6 +366,11 @@ def main():
         default=0.8,
         help="Similarity threshold for grouping (0.0 to 1.0, default: 0.8)"
     )
+    parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose output'
+    )
     
     args = parser.parse_args()
     
@@ -361,9 +390,10 @@ def main():
         print(f"Error: '{input_dir}' is not a directory")
         sys.exit(1)
     
-    print(f"Processing description files in: {input_dir}")
-    print(f"Similarity threshold: {args.threshold * 100}%")
-    print("-" * 50)
+    if args.verbose:
+        print(f"Processing description files in: {input_dir}")
+        print(f"Similarity threshold: {args.threshold * 100}%")
+        print("-" * 50)
     
     # Record start time for performance measurement
     start_time = time.perf_counter()
@@ -376,18 +406,20 @@ def main():
         print("Make sure files follow the pattern: VID_*.description.json")
         sys.exit(0)
     
-    print(f"Found {len(description_files)} video description files")
-    print()
+    if args.verbose:
+        print(f"Found {len(description_files)} video description files")
+        print()
     
     # Process each description file
     processed_count = 0
     failed_count = 0
     grouped_descriptions = {}
     
-    for file_path in sorted(description_files):
-        print(f"Processing: {file_path.name}")
+    for i, file_path in enumerate(sorted(description_files), 1):
+        if args.verbose:
+            print(f"Processing: {file_path.name}")
         
-        result = process_description_file(file_path, args.threshold)
+        result = process_description_file(file_path, args.threshold, args.verbose)
         if result:
             processed_count += 1
             # Extract video stem from the output filename for the summary
@@ -397,29 +429,42 @@ def main():
                 with open(result, 'r', encoding='utf-8') as f:
                     grouped_descriptions[video_stem] = json.load(f)
             except Exception as e:
-                print(f"  Warning: Could not read grouped descriptions for summary: {e}")
+                if args.verbose:
+                    print(f"  Warning: Could not read grouped descriptions for summary: {e}")
         else:
             failed_count += 1
-        print()
+        
+        # Update progress bar in quiet mode
+        if not args.verbose:
+            print_progress_bar(i, len(description_files))
+    
+    # Clear the progress line and show final result
+    if not args.verbose:
+        sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
+        sys.stdout.flush()
     
     # Create folder summary if we have any successful processing
     if processed_count > 0:
-        print("Creating folder summary...")
+        if args.verbose:
+            print("Creating folder summary...")
         create_folder_descriptions_summary(input_dir, grouped_descriptions)
     
     # Calculate and display execution time
     end_time = time.perf_counter()
     total_time = end_time - start_time
     
-    print("=" * 50)
-    print(f"Processing complete!")
-    print(f"Files processed: {processed_count}")
-    print(f"Files failed: {failed_count}")
-    print(f"Total execution time: {total_time:.2f} seconds")
-    
-    if processed_count > 0:
-        avg_time = total_time / processed_count
-        print(f"Average time per file: {avg_time:.2f} seconds")
+    if args.verbose:
+        print("=" * 50)
+        print(f"Processing complete!")
+        print(f"Files processed: {processed_count}")
+        print(f"Files failed: {failed_count}")
+        print(f"Total execution time: {total_time:.2f} seconds")
+        
+        if processed_count > 0:
+            avg_time = total_time / processed_count
+            print(f"Average time per file: {avg_time:.2f} seconds")
+    else:
+        print(f"Processing complete! {processed_count} files processed in {total_time:.2f} seconds")
 
 
 if __name__ == "__main__":

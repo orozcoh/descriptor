@@ -25,6 +25,11 @@ import shutil
 from pathlib import Path
 from typing import List, Tuple
 
+# ANSI escape codes for terminal control
+CLEAR_LINE = '\033[K'  # Clear from cursor to end of line
+CURSOR_UP = '\033[1A'   # Move cursor up one line
+CURSOR_DOWN = '\033[1B' # Move cursor down one line
+
 
 def find_frames_directories(root_path: Path) -> List[Path]:
     """Find all 'frames' directories recursively."""
@@ -41,39 +46,61 @@ def find_description_files(root_path: Path, pattern: str) -> List[Path]:
     return list(root_path.rglob(pattern))
 
 
-def delete_frames_directories(frames_dirs: List[Path]) -> Tuple[int, List[str]]:
+def print_progress_bar(current, total, bar_width=20):
+    """Print a progress bar that updates in place."""
+    if total == 0:
+        return
+    
+    percent = (current / total) * 100
+    filled_width = int(bar_width * current // total)
+    bar = '█' * filled_width + '░' * (bar_width - filled_width)
+    
+    # Use \r to return cursor to beginning of line and \033[K to clear the rest of the line
+    sys.stdout.write(f'\rProgress: {percent:3.0f}% [{bar}] {current}/{total} items\033[K')
+    sys.stdout.flush()
+
+
+def delete_frames_directories(frames_dirs: List[Path], verbose: bool = False) -> Tuple[int, List[str]]:
     """Delete frames directories and return count and any errors."""
     deleted_count = 0
     errors = []
     
-    for frames_dir in frames_dirs:
+    for i, frames_dir in enumerate(frames_dirs, 1):
         try:
             if frames_dir.exists():
                 shutil.rmtree(frames_dir)
-                print(f"Deleted: {frames_dir}")
+                if verbose:
+                    print(f"Deleted: {frames_dir}")
                 deleted_count += 1
+                if not verbose:
+                    print_progress_bar(i, len(frames_dirs))
         except Exception as e:
             error_msg = f"Error deleting {frames_dir}: {e}"
-            print(f"Warning: {error_msg}")
+            if verbose:
+                print(f"Warning: {error_msg}")
             errors.append(error_msg)
     
     return deleted_count, errors
 
 
-def delete_files(file_list: List[Path]) -> Tuple[int, List[str]]:
+def delete_files(file_list: List[Path], verbose: bool = False) -> Tuple[int, List[str]]:
     """Delete files and return count and any errors."""
     deleted_count = 0
     errors = []
     
-    for file_path in file_list:
+    for i, file_path in enumerate(file_list, 1):
         try:
             if file_path.exists():
                 file_path.unlink()
-                print(f"Deleted: {file_path}")
+                if verbose:
+                    print(f"Deleted: {file_path}")
                 deleted_count += 1
+                if not verbose:
+                    print_progress_bar(i, len(file_list))
         except Exception as e:
             error_msg = f"Error deleting {file_path}: {e}"
-            print(f"Warning: {error_msg}")
+            if verbose:
+                print(f"Warning: {error_msg}")
             errors.append(error_msg)
     
     return deleted_count, errors
@@ -101,38 +128,43 @@ def main():
     )
     
     parser.add_argument(
-        'function',
+        'target',
         nargs='?',
-        choices=['frames', 'description', 'descriptions', 'scenes', 'purge'],
-        help='Type of files to delete (default: frames + description + scenes)'
+        help='Directory to search in, or function type (frames/description/descriptions/scenes/purge). If directory, uses default behavior.'
     )
     
     parser.add_argument(
-        'path',
-        nargs='?',
-        default='.',
-        help='Directory to search in (default: current directory)'
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose output'
     )
     
     args = parser.parse_args()
     
-    # Determine root path based on arguments
-    if args.function is None:
-        # No function provided, use the path if provided, otherwise current directory
-        root_path = Path(args.path).resolve() if args.path != '.' else Path('.').resolve()
+    # Determine function and path based on the target argument
+    if args.target is None:
+        # No arguments provided, use default behavior in current directory
+        function = None
+        root_path = Path('.').resolve()
+    elif args.target in ['frames', 'description', 'descriptions', 'scenes', 'purge']:
+        # Target is a function, use current directory
+        function = args.target
+        root_path = Path('.').resolve()
     else:
-        # Function provided, use the path if provided, otherwise current directory
-        root_path = Path(args.path).resolve() if args.path != '.' else Path('.').resolve()
+        # Target is a directory path, use default behavior
+        function = None
+        root_path = Path(args.target).resolve()
     
     if not root_path.exists():
         print(f"Error: Path '{root_path}' does not exist.")
         sys.exit(1)
     
-    print(f"Searching in: {root_path}")
-    print()
+    if args.verbose:
+        print(f"Searching in: {root_path}")
+        print()
     
     # Handle purge operation with confirmation
-    if args.function == 'purge':
+    if function == 'purge':
         if not confirm_purge_operation(root_path):
             print("Operation cancelled.")
             sys.exit(0)
@@ -148,92 +180,29 @@ def main():
         all_errors = []
         
         if frames_dirs:
-            count, errors = delete_frames_directories(frames_dirs)
+            count, errors = delete_frames_directories(frames_dirs, args.verbose)
             total_deleted += count
             all_errors.extend(errors)
         
         if description_files:
-            count, errors = delete_files(description_files)
+            count, errors = delete_files(description_files, args.verbose)
             total_deleted += count
             all_errors.extend(errors)
         
         if descriptions_files:
-            count, errors = delete_files(descriptions_files)
+            count, errors = delete_files(descriptions_files, args.verbose)
             total_deleted += count
             all_errors.extend(errors)
         
         if scene_files:
-            count, errors = delete_files(scene_files)
+            count, errors = delete_files(scene_files, args.verbose)
             total_deleted += count
             all_errors.extend(errors)
         
         # Summary
-        print(f"\n{'='*50}")
-        print(f"PURGE COMPLETE")
-        print(f"Total files/directories deleted: {total_deleted}")
-        if all_errors:
-            print(f"Errors encountered: {len(all_errors)}")
-            for error in all_errors:
-                print(f"  - {error}")
-        else:
-            print("No errors encountered.")
-        print(f"{'='*50}")
-        
-    else:
-        # Handle specific operations
-        total_deleted = 0
-        all_errors = []
-        
-        # Determine what to delete based on function or default behavior
-        delete_frames = args.function == 'frames' or args.function is None
-        delete_descriptions = args.function == 'description' or args.function is None
-        delete_descriptions_only = args.function == 'descriptions'
-        delete_scenes = args.function == 'scenes' or args.function is None
-        
-        if delete_frames:
-            frames_dirs = find_frames_directories(root_path)
-            if frames_dirs:
-                print("Deleting frames directories...")
-                count, errors = delete_frames_directories(frames_dirs)
-                total_deleted += count
-                all_errors.extend(errors)
-            elif args.function == 'frames':
-                print("No frames directories found.")
-        
-        if delete_descriptions:
-            description_files = find_description_files(root_path, "*.description.json")
-            if description_files:
-                print("Deleting .description.json files...")
-                count, errors = delete_files(description_files)
-                total_deleted += count
-                all_errors.extend(errors)
-            elif args.function == 'description':
-                print("No .description.json files found.")
-        
-        if delete_descriptions_only:
-            descriptions_files = find_description_files(root_path, "*.descriptions.json")
-            if descriptions_files:
-                print("Deleting .descriptions.json files...")
-                count, errors = delete_files(descriptions_files)
-                total_deleted += count
-                all_errors.extend(errors)
-            else:
-                print("No .descriptions.json files found.")
-        
-        if delete_scenes:
-            scene_files = find_description_files(root_path, "*.scene.json")
-            if scene_files:
-                print("Deleting .scene.json files...")
-                count, errors = delete_files(scene_files)
-                total_deleted += count
-                all_errors.extend(errors)
-            elif args.function == 'scenes':
-                print("No .scene.json files found.")
-        
-        # Summary for non-purge operations
-        if total_deleted > 0:
+        if args.verbose:
             print(f"\n{'='*50}")
-            print(f"OPERATION COMPLETE")
+            print(f"PURGE COMPLETE")
             print(f"Total files/directories deleted: {total_deleted}")
             if all_errors:
                 print(f"Errors encountered: {len(all_errors)}")
@@ -242,8 +211,91 @@ def main():
             else:
                 print("No errors encountered.")
             print(f"{'='*50}")
-        elif args.function is not None:
-            print(f"\nNo files found to delete for function '{args.function}'.")
+        else:
+            # Clear progress line and show minimal completion message
+            sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
+            sys.stdout.flush()
+            print(f"Purge complete! {total_deleted} items deleted successfully")
+            if all_errors:
+                print(f"Errors encountered: {len(all_errors)}")
+        
+    else:
+        # Handle specific operations
+        total_deleted = 0
+        all_errors = []
+        
+        # Determine what to delete based on function or default behavior
+        delete_frames = function == 'frames' or function is None
+        delete_descriptions = function == 'description' or function is None
+        delete_descriptions_only = function == 'descriptions'
+        delete_scenes = function == 'scenes' or function is None
+        
+        if delete_frames:
+            frames_dirs = find_frames_directories(root_path)
+            if frames_dirs:
+                if args.verbose:
+                    print("Deleting frames directories...")
+                count, errors = delete_frames_directories(frames_dirs, args.verbose)
+                total_deleted += count
+                all_errors.extend(errors)
+            elif function == 'frames' and args.verbose:
+                print("No frames directories found.")
+        
+        if delete_descriptions:
+            description_files = find_description_files(root_path, "*.description.json")
+            if description_files:
+                if args.verbose:
+                    print("Deleting .description.json files...")
+                count, errors = delete_files(description_files, args.verbose)
+                total_deleted += count
+                all_errors.extend(errors)
+            elif function == 'description' and args.verbose:
+                print("No .description.json files found.")
+        
+        if delete_descriptions_only:
+            descriptions_files = find_description_files(root_path, "*.descriptions.json")
+            if descriptions_files:
+                if args.verbose:
+                    print("Deleting .descriptions.json files...")
+                count, errors = delete_files(descriptions_files, args.verbose)
+                total_deleted += count
+                all_errors.extend(errors)
+            elif args.verbose:
+                print("No .descriptions.json files found.")
+        
+        if delete_scenes:
+            scene_files = find_description_files(root_path, "*.scene.json")
+            if scene_files:
+                if args.verbose:
+                    print("Deleting .scene.json files...")
+                count, errors = delete_files(scene_files, args.verbose)
+                total_deleted += count
+                all_errors.extend(errors)
+            elif function == 'scenes' and args.verbose:
+                print("No .scene.json files found.")
+        
+        # Summary for non-purge operations
+        if total_deleted > 0:
+            if args.verbose:
+                print(f"\n{'='*50}")
+                print(f"OPERATION COMPLETE")
+                print(f"Total files/directories deleted: {total_deleted}")
+                if all_errors:
+                    print(f"Errors encountered: {len(all_errors)}")
+                    for error in all_errors:
+                        print(f"  - {error}")
+                else:
+                    print("No errors encountered.")
+                print(f"{'='*50}")
+            else:
+                # Clear progress line and show minimal completion message
+                sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
+                sys.stdout.flush()
+                print(f"Operation complete! {total_deleted} items deleted successfully")
+                if all_errors:
+                    print(f"Errors encountered: {len(all_errors)}")
+        elif function is not None and args.verbose:
+            print(f"\nNo files found to delete for function '{function}'.")
 
 
 if __name__ == "__main__":

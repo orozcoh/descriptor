@@ -18,6 +18,11 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
+# ANSI escape codes for terminal control
+CLEAR_LINE = '\033[K'  # Clear from cursor to end of line
+CURSOR_UP = '\033[1A'   # Move cursor up one line
+CURSOR_DOWN = '\033[1B' # Move cursor down one line
+
 
 # Supported video extensions
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.m4v', '.wmv'}
@@ -196,7 +201,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 
-def save_scene_data(video_path: str, scene_data: dict) -> bool:
+def save_scene_data(video_path: str, scene_data: dict, verbose: bool = False) -> bool:
     """Save scene data to a JSON file."""
     video_dir = os.path.dirname(video_path)
     video_name = Path(video_path).stem
@@ -209,40 +214,61 @@ def save_scene_data(video_path: str, scene_data: dict) -> bool:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(scene_data, f, indent=2, ensure_ascii=False)
         
-        print(f"  Saved scene data to: {output_filename}")
+        if verbose:
+            print(f"  Saved scene data to: {output_filename}")
         return True
         
     except Exception as e:
-        print(f"  Error saving scene data: {e}")
+        if verbose:
+            print(f"  Error saving scene data: {e}")
         return False
 
 
-def extract_scenes(video_path: str, threshold: float = DEFAULT_SCENE_THRESHOLD) -> bool:
+def print_progress_bar(current, total, bar_width=20):
+    """Print a progress bar that updates in place."""
+    if total == 0:
+        return
+    
+    percent = (current / total) * 100
+    filled_width = int(bar_width * current // total)
+    bar = '█' * filled_width + '░' * (bar_width - filled_width)
+    
+    # Use \r to return cursor to beginning of line and \033[K to clear the rest of the line
+    sys.stdout.write(f'\rProgress: {percent:3.0f}% [{bar}] {current}/{total} videos\033[K')
+    sys.stdout.flush()
+
+
+def extract_scenes(video_path: str, threshold: float = DEFAULT_SCENE_THRESHOLD, verbose: bool = False) -> bool:
     """
     Extract scenes from a video file.
     
     Args:
         video_path: Path to the video file
         threshold: Scene change detection threshold
+        verbose: Whether to print detailed output
     
     Returns:
         True if successful, False otherwise
     """
     video_name = Path(video_path).stem
     
-    print(f"  Extracting scenes from: {video_name}")
+    if verbose:
+        print(f"  Extracting scenes from: {video_name}")
     
     # Get video duration
     duration = get_video_duration(video_path)
     if duration <= 0:
-        print(f"  Skipping {video_path} - could not determine duration")
+        if verbose:
+            print(f"  Skipping {video_path} - could not determine duration")
         return False
     
-    print(f"  Video duration: {format_timestamp(duration)}")
+    if verbose:
+        print(f"  Video duration: {format_timestamp(duration)}")
     
     # Extract scene changes
     scene_changes = extract_scene_changes(video_path, threshold)
-    print(f"  Detected {len(scene_changes)} scene changes")
+    if verbose:
+        print(f"  Detected {len(scene_changes)} scene changes")
     
     # Create scene segments
     scenes = create_scene_segments(scene_changes, duration)
@@ -256,10 +282,11 @@ def extract_scenes(video_path: str, threshold: float = DEFAULT_SCENE_THRESHOLD) 
     }
     
     # Save to JSON file
-    success = save_scene_data(video_path, scene_data)
+    success = save_scene_data(video_path, scene_data, verbose)
     
     if success:
-        print(f"  Successfully extracted {len(scenes)} scenes")
+        if verbose:
+            print(f"  Successfully extracted {len(scenes)} scenes")
         return True
     else:
         return False
@@ -299,9 +326,10 @@ def main():
         print(f"Error: '{directory}' is not a directory.")
         sys.exit(1)
     
-    print(f"Scanning for videos in: {directory}")
-    print(f"Scene detection threshold: {args.threshold}")
-    print("-" * 50)
+    if args.verbose:
+        print(f"Scanning for videos in: {directory}")
+        print(f"Scene detection threshold: {args.threshold}")
+        print("-" * 50)
     
     video_files = find_video_files(directory)
     
@@ -309,20 +337,36 @@ def main():
         print("No video files found.")
         sys.exit(0)
     
-    print(f"Found {len(video_files)} video file(s)\n")
+    if args.verbose:
+        print(f"Found {len(video_files)} video file(s)\n")
     
     success_count = 0
     for i, video_path in enumerate(video_files, 1):
-        print(f"[{i}/{len(video_files)}] Processing: {os.path.basename(video_path)}")
-        if extract_scenes(video_path, args.threshold):
+        if args.verbose:
+            print(f"[{i}/{len(video_files)}] Processing: {os.path.basename(video_path)}")
+        
+        if extract_scenes(video_path, args.threshold, args.verbose):
             success_count += 1
-        print()
+        
+        # Update progress bar in quiet mode
+        if not args.verbose:
+            print_progress_bar(i, len(video_files))
     
-    print("-" * 50)
-    print(f"Completed: {success_count}/{len(video_files)} videos processed successfully")
+    # Clear the progress line and show final result
+    if not args.verbose:
+        sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
+        sys.stdout.flush()
     
-    if success_count < len(video_files):
-        sys.exit(1)
+    if args.verbose:
+        print("-" * 50)
+        print(f"Completed: {success_count}/{len(video_files)} videos processed successfully")
+        
+        if success_count < len(video_files):
+            sys.exit(1)
+    else:
+        print(f"Processing complete! {success_count}/{len(video_files)} videos processed successfully")
+        if success_count < len(video_files):
+            sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -16,6 +16,11 @@ import argparse
 import re
 from pathlib import Path
 
+# ANSI escape codes for terminal control
+CLEAR_LINE = '\033[K'  # Clear from cursor to end of line
+CURSOR_UP = '\033[1A'   # Move cursor up one line
+CURSOR_DOWN = '\033[1B' # Move cursor down one line
+
 # Supported video extensions
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.m4v', '.wmv'}
 
@@ -54,16 +59,17 @@ def get_video_duration(video_path: str) -> float:
         return 0
 
 
-def extract_frames(video_path: str, interval: float = 1.0) -> bool:
+def extract_frames(video_path: str, interval: float = 1.0, verbose: bool = False) -> int:
     """
     Extract frames from a video file using FFmpeg.
     
     Args:
         video_path: Path to the video file
         interval: Time interval between frames in seconds (default: 1.0)
+        verbose: Whether to print detailed output
     
     Returns:
-        True if successful, False otherwise
+        Number of frames extracted, or 0 if failed
     """
     video_dir = os.path.dirname(video_path)
     video_name = Path(video_path).stem
@@ -75,8 +81,9 @@ def extract_frames(video_path: str, interval: float = 1.0) -> bool:
     # Get video duration
     duration = get_video_duration(video_path)
     if duration <= 0:
-        print(f"  Skipping {video_path} - could not determine duration")
-        return False
+        if verbose:
+            print(f"  Skipping {video_path} - could not determine duration")
+        return 0
     
     # Output pattern for frames
     output_pattern = os.path.join(frames_dir, f'{video_name}_%04d.png')
@@ -96,18 +103,35 @@ def extract_frames(video_path: str, interval: float = 1.0) -> bool:
     ]
     
     try:
-        print(f"  Extracting frames to: {frames_dir}")
+        if verbose:
+            print(f"  Extracting frames to: {frames_dir}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         
         # Count extracted frames
         frame_count = len([f for f in os.listdir(frames_dir) if f.endswith('.png') and f.startswith(video_name)])
-        print(f"  Successfully extracted {frame_count} frames from {video_name}")
-        return True
+        if verbose:
+            print(f"  Successfully extracted {frame_count} frames from {video_name}")
+        return frame_count
         
     except subprocess.CalledProcessError as e:
-        print(f"  Error extracting frames from {video_path}:")
-        print(f"  {e.stderr}")
-        return False
+        if verbose:
+            print(f"  Error extracting frames from {video_path}:")
+            print(f"  {e.stderr}")
+        return 0
+
+
+def print_progress_bar(current, total, bar_width=20):
+    """Print a progress bar that updates in place."""
+    if total == 0:
+        return
+    
+    percent = (current / total) * 100
+    filled_width = int(bar_width * current // total)
+    bar = '█' * filled_width + '░' * (bar_width - filled_width)
+    
+    # Use \r to return cursor to beginning of line and \033[K to clear the rest of the line
+    sys.stdout.write(f'\rProgress: {percent:3.0f}% [{bar}] {current}/{total} frames\033[K')
+    sys.stdout.flush()
 
 
 def main():
@@ -144,26 +168,65 @@ def main():
         print(f"Error: '{directory}' is not a directory.")
         sys.exit(1)
     
-    print(f"Scanning for videos in: {directory}")
-    print(f"Frame interval: {args.interval} seconds")
-    print("-" * 50)
+    if args.verbose:
+        print(f"Scanning for videos in: {directory}")
+        print(f"Frame interval: {args.interval} seconds")
+        print("-" * 50)
     
     video_files = find_video_files(directory)
     
     if not video_files:
-        print("No video files found.")
+        if args.verbose:
+            print("No video files found.")
+        else:
+            print("No video files found.")
         sys.exit(0)
     
-    print(f"Found {len(video_files)} video file(s)\n")
+    if args.verbose:
+        print(f"Found {len(video_files)} video file(s)\n")
+    else:
+        print(f"Found {len(video_files)} video file(s)")
+    
+    # Calculate total frames to be extracted (estimate based on duration)
+    total_frames_estimate = 0
+    for video_path in video_files:
+        duration = get_video_duration(video_path)
+        if duration > 0:
+            estimated_frames = int(duration / args.interval)
+            total_frames_estimate += estimated_frames
     
     success_count = 0
-    for i, video_path in enumerate(video_files, 1):
-        print(f"[{i}/{len(video_files)}] Processing: {os.path.basename(video_path)}")
-        if extract_frames(video_path, args.interval):
-            success_count += 1
-        print()
+    total_extracted_frames = 0
     
-    print("-" * 50)
+    for i, video_path in enumerate(video_files, 1):
+        if args.verbose:
+            print(f"[{i}/{len(video_files)}] Processing: {os.path.basename(video_path)}")
+        
+        # Extract frames and get count
+        video_dir = os.path.dirname(video_path)
+        video_name = Path(video_path).stem
+        frames_dir = os.path.join(video_dir, 'frames')
+        
+        frame_count = extract_frames(video_path, args.interval, args.verbose)
+        if frame_count > 0:
+            success_count += 1
+            total_extracted_frames += frame_count
+        
+        if args.verbose:
+            print()
+        
+        # Update progress bar
+        if not args.verbose:
+            print_progress_bar(total_extracted_frames, total_frames_estimate)
+    
+    if not args.verbose:
+        # Clear the progress line and show final result
+        sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
+        sys.stdout.flush()
+    
+    if args.verbose:
+        print("-" * 50)
+    
     print(f"Completed: {success_count}/{len(video_files)} videos processed successfully")
     
     if success_count < len(video_files):

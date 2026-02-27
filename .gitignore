@@ -1,4 +1,5 @@
 content/*
 venv/*
+test/*
 
 .DS_Store

@@ -1,163 +1,425 @@
-# Frame Extractor
+# 🎬 Descriptor - AI Video Description Pipeline
 
-A Python3 script that extracts frames from video files using FFmpeg.
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Required-black.svg)](https://developer.apple.com/apple-silicon/)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-Required-orange.svg)](https://ffmpeg.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Description
+A sophisticated video processing pipeline that transforms raw video files into structured, AI-analyzed descriptions with scene detection and semantic grouping.
 
-This script extracts individual frames from video files (MP4, AVI, MOV, MKV, WebM, FLV, M4V, WMV) at specified intervals. Each frame is saved as a PNG image with 720p resolution (downscaled if the source is larger).
+⚠️ **Important**: This pipeline currently only works on **Apple Silicon Macs** due to MLX dependencies.
 
-## Prerequisites
+## ✨ Features
 
-- **Python 3** - The script uses only Python standard library modules
-- **FFmpeg** - Required for video processing
+- 🖼️ **Smart Frame Extraction** - Extract frames at configurable intervals with 720p downscaling
+- 🎭 **Scene Detection** - Automatically detect scene changes using FFmpeg's scene filter
+- 🤖 **AI-Powered Descriptions** - Generate frame descriptions using MLX VLM (FastVLM-0.5B)
+- 🔗 **Semantic Grouping** - Group similar consecutive descriptions using sequence matching
+- 🚀 **Complete Pipeline** - One-command processing from video to structured JSON output
+- 🔄 **Resumable Processing** - Skip already processed files for efficiency
+- 🧹 **Smart Cleanup** - Remove temporary files while preserving final outputs
+- 📊 **Rich Output** - Timestamped descriptions merged with scene change information
 
-### Installing FFmpeg
+## 🚀 Quick Start
 
-**macOS:**
+### 1. Install Dependencies
+
 ```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Install FFmpeg (required for video processing)
+# macOS:
 brew install ffmpeg
-```
 
-**Ubuntu/Debian:**
-```bash
+# Ubuntu/Debian:
 sudo apt install ffmpeg
+
+# Windows: Download from https://ffmpeg.org/download.html
 ```
 
-**Windows:**
-Download from [ffmpeg.org](https://ffmpeg.org/download.html) or use a package manager like Chocolatey:
-```bash
-choco install ffmpeg
-```
-
-## Usage
+### 2. Run the Complete Pipeline
 
 ```bash
-python3 frame-extractor <directory_path> [options]
+# Process all videos in a directory
+python3 descriptor.py path/to/folder
+
+# Process current directory
+python3 descriptor.py .
+
+# Process with verbose output
+python3 descriptor.py path/to/folder --verbose
 ```
 
-### Examples
+### 3. View Results
 
-Extract frames at 1 second intervals from a specific directory:
+The pipeline generates structured JSON files with:
+- Timestamped descriptions grouped by similarity
+- Scene change information with thresholds
+- Clean, organized folder structure
+
+## 📋 Installation
+
+### Prerequisites
+
+- **Python 3.10+** (required for MLX dependencies)
+- **FFmpeg** (for video processing)
+- **Metal GPU** (recommended for MLX performance on macOS)
+
+### Setup
+
 ```bash
-python3 frame-extractor ./content/2026/26-week-1-2
-```
+# Clone or download the project
+git clone <repository-url>
+cd descriptor
 
-Extract frames at 0.5 second intervals:
-```bash
-python3 frame-extractor ./content/2026/26-week-1-2 -i 0.5
-```
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-Extract frames from the current directory:
-```bash
-python3 frame-extractor .
-```
-
-## Options
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `directory` | Directory containing video files | `.` (current directory) |
-| `-i, --interval` | Interval between frames in seconds | `1.0` |
-| `-v, --verbose` | Enable verbose output | `false` |
-
-## Output
-
-Frames are saved in a `frames` subdirectory within each video's directory.
-
-### Naming Convention
-
-Frames are named as: `<video_filename>_<frame_number>.png`
-
-Example:
-```
-Content/2026/26-week-1-2/
-├── VID_20260224_123820.mp4
-└── frames/
-    ├── VID_20260224_123820_0001.png
-    ├── VID_20260224_123820_0002.png
-    ├── VID_20260224_123820_0003.png
-    └── ...
-```
-
-### Resolution
-
-All frames are scaled to 720p (1280x720) using Lanczos scaling with aspect ratio preservation. If the source video is smaller than 720p, it remains at original resolution.
-
-## No External Dependencies
-
-This script uses only Python's standard library. No `requirements.txt` or `pip install` needed!
-
-- `os` - File system operations
-- `sys` - System arguments
-- `subprocess` - Run FFmpeg commands
-- `argparse` - Command-line parsing
-- `pathlib` - Path handling
-
----
-
-## Frame Description Script (Des-script)
-
-Generate video descriptions using Moondream AI.
-
-### Prerequisites (use venv)
-
-1. Create & activate venv with Python >=3.10 (moondream requires it):
-```bash
-/opt/homebrew/bin/python3.14 -m venv venv
-source venv/bin/activate  # or venv/bin/Activate.ps1 on Windows
-```
-
-2. Install deps:
-```bash
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-### Usage
+### Dependencies
 
-```bash
-python3 Des-script <directory_path> [options]
+```txt
+mlx-lm==0.30.7      # MLX language model framework
+mlx-metal==0.30.6   # MLX Metal backend for Apple Silicon
+mlx-vlm==0.3.12     # MLX Vision-Language Models
+timm==1.0.25        # PyTorch Image Models
 ```
 
-### Examples
+## 🛠️ Usage Guide
 
-Generate descriptions for videos in a directory:
+### Main Pipeline: `descriptor.py`
+
+The orchestrator script that runs the complete 5-step workflow:
+
 ```bash
-python3 Des-script ./content/2026/26-week-1-2
+python3 descriptor.py [directory_path] [options]
 ```
 
-Use custom endpoint:
+**Examples:**
 ```bash
-python3 Des-script ./content/2026/26-week-1-2 -e http://localhost:2020/v1
+# Process specific directory
+python3 descriptor.py path/to/folder
+
+# Process current directory
+python3 descriptor.py .
+
+# Verbose output
+python3 descriptor.py path/to/folder --verbose
 ```
 
-### Options
+**Pipeline Steps:**
+1. 📸 **Frame Extraction** - Extract frames from videos
+2. 🎬 **Scene Detection** - Identify scene changes
+3. 🤖 **AI Description** - Generate descriptions for frames
+4. 🔗 **Description Grouping** - Group similar descriptions
+5. 🧹 **Cleanup** - Remove temporary files
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `directory` | Directory containing video files | `.` |
-| `-i, --interval` | Frame interval in seconds | `1.0` |
-| `-e, --endpoint` | Moondream endpoint URL | `http://localhost:2020/v1` |
-| `--force` | Reprocess all videos even if .description.json exists | `false` |
+---
 
-### Output
+### Individual Scripts
 
-1. **Per-video descriptions**: `<video_name>.description.json` (all frames + normalized-grouped summaries)
-2. **Folder summary**: `<folder_name>.json` (recursive scan of all descriptions with relative paths)
+#### Frame Extractor: `frame-extractor.py`
 
-Example folder summary entry:
+Extract frames from video files at specified intervals.
+
+```bash
+python3 frame-extractor.py [directory] [options]
+```
+
+**Options:**
+- `-i, --interval` - Time interval between frames in seconds (default: 1.0)
+- `-v, --verbose` - Enable verbose output
+
+**Examples:**
+```bash
+# Extract frames every 1 second
+python3 frame-extractor.py path/to/folder
+
+# Extract frames every 0.5 seconds
+python3 frame-extractor.py path/to/folder -i 0.5
+
+# Verbose output
+python3 frame-extractor.py path/to/folder -v
+```
+
+**Output:** PNG frames in `frames/` subdirectory, scaled to 720p
+
+---
+
+#### Scene Extractor: `scene-extractor.py`
+
+Detect scene changes in video files using FFmpeg.
+
+```bash
+python3 scene-extractor.py [directory] [options]
+```
+
+**Options:**
+- `-t, --threshold` - Scene change detection threshold (0.0-1.0, default: 0.4)
+- `-v, --verbose` - Enable verbose output
+
+**Examples:**
+```bash
+# Detect scenes with default threshold
+python3 scene-extractor.py path/to/folder
+
+# Use custom threshold
+python3 scene-extractor.py path/to/folder -t 0.6
+
+# Verbose output
+python3 scene-extractor.py path/to/folder -v
+```
+
+**Output:** `*.scene.json` files with scene change timestamps and scores
+
+---
+
+#### AI Description: `describeAI.py`
+
+Generate AI descriptions for video frames using MLX VLM.
+
+```bash
+python3 describeAI.py [folder_path] [options]
+```
+
+**Options:**
+- `-v, --verbose` - Enable verbose output
+
+**Examples:**
+```bash
+# Generate descriptions for frames in a folder
+python3 describeAI.py path/to/folder
+
+# Verbose output
+python3 describeAI.py path/to/folder -v
+```
+
+**Requirements:** Must be run in a folder containing a `frames/` directory
+
+**Output:** `*.description.json` files with timestamped descriptions
+
+---
+
+#### Description Grouping: `des-group.py`
+
+Group similar consecutive descriptions into time ranges.
+
+```bash
+python3 des-group.py [directory] [options]
+```
+
+**Options:**
+- `--threshold` - Similarity threshold for grouping (0.0-1.0, default: 0.8)
+- `-v, --verbose` - Enable verbose output
+
+**Examples:**
+```bash
+# Group descriptions with default threshold
+python3 des-group.py path/to/folder
+
+# Use custom similarity threshold
+python3 des-group.py path/to/folder --threshold 0.75
+
+# Verbose output
+python3 des-group.py path/to/folder -v
+```
+
+**Requirements:** Requires both `*.description.json` and `*.scene.json` files
+
+**Output:** `*.descriptions.json` files with grouped descriptions and scene data
+
+---
+
+#### Cleanup Utility: `clear-files.py`
+
+Remove temporary files created during processing.
+
+```bash
+python3 clear-files.py [target] [options]
+```
+
+**Targets:**
+- `frames` - Remove only frames directories
+- `description` - Remove only `.description.json` files
+- `descriptions` - Remove only `.descriptions.json` files
+- `scenes` - Remove only `.scene.json` files
+- `purge` - Remove everything (with confirmation)
+
+**Options:**
+- `-v, --verbose` - Enable verbose output
+
+**Examples:**
+```bash
+# Remove frames directories only
+python3 clear-files.py frames
+
+# Remove all temporary files (with confirmation)
+python3 clear-files.py purge
+
+# Remove descriptions in specific directory
+python3 clear-files.py description path/to/folder
+
+# Verbose output
+python3 clear-files.py purge -v
+```
+
+## 🔄 Workflow Diagram
+
+```mermaid
+graph TD
+    A[Video Files] --> B[Frame Extraction]
+    B --> C[Scene Detection]
+    B --> D[AI Description Generation]
+    C --> E[Description Grouping]
+    D --> E
+    E --> F[Final JSON Output]
+    G[Cleanup] --> H[Remove Temporary Files]
+    
+    B --> I[frames/ directory]
+    D --> J[*.description.json]
+    C --> K[*.scene.json]
+    E --> L[*.descriptions.json]
+```
+
+## 📊 Output Format
+
+### Grouped Descriptions with Scene Data
+
 ```json
 {
-  "video_relative": "VID_20260224_123820.mp4",
-  "description_file": "VID_20260224_123820.description.json",
-  "total_frames": 123,
-  "time_range": "00:00:01 - 00:02:03"
+  "folder": "path/to/folder",
+  "videos": {
+    "VID_20260224_123820": {
+      "timestamps": [
+        {
+          "start_time": "000:00:00.000",
+          "end_time": "000:00:03.000",
+          "description": "A person is walking on a sidewalk with a green line painted on it."
+        },
+        {
+          "start_time": "000:00:04.000",
+          "end_time": "000:00:05.000",
+          "description": "A street scene with a tall building in the background and a person riding a motorcycle."
+        }
+      ],
+      "scenes-info": {
+        "scene_threshold": 0.4,
+        "total_scenes": 2,
+        "scenes": [
+          {
+            "scene_number": 1,
+            "start_time": "00:00:00.000",
+            "end_time": "00:00:03.125",
+            "duration": 3.125,
+            "scene_changes": [
+              {
+                "frame_number": 123,
+                "timestamp": "00:00:02.100000",
+                "seconds": 2.1,
+                "scene_score": 0.45
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
 }
 ```
 
-### Features
+### Frame Descriptions (Intermediate)
 
-- **Resumable**: Skips existing .description.json files
-- **Force reprocess**: `--force` to regenerate all
-- **Smart grouping**: Normalizes descriptions (lowercase, strip punctuation) for consecutive similar scenes
-- **Recursive**: Handles subdirectories, skips frames/
+```json
+{
+  "000:00:00.000": "A black elevator control panel with a red arrow pointing down.",
+  "000:00:01.000": "A black and white image of an elevator control panel.",
+  "000:00:02.000": "A black and white elevator with a red arrow pointing down.",
+  "000:00:03.000": "A close-up of an elevator floor with a keypad and a yellow button."
+}
+```
 
+### Scene Data (Intermediate)
+
+```json
+{
+  "video_file": "path/to/folder/video_file.mp4",
+  "scene_threshold": 0.4,
+  "total_scenes": 1,
+  "scenes": [
+    {
+      "scene_number": 1,
+      "start_time": "00:00:00.000",
+      "end_time": "00:00:05.627",
+      "duration": 5.626967,
+      "scene_changes": []
+    }
+  ]
+}
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. FFmpeg not found**
+```bash
+# Install FFmpeg
+brew install ffmpeg  # macOS
+sudo apt install ffmpeg  # Ubuntu/Debian
+```
+
+**2. Python version too old**
+```bash
+# Check Python version
+python3 --version
+
+# MLX requires Python 3.10+
+# Install latest Python if needed
+```
+
+**3. MLX installation issues**
+```bash
+# Ensure you're using Python 3.10+
+# Install MLX dependencies
+pip install mlx-lm mlx-vlm timm
+```
+
+**4. Permission errors**
+```bash
+# Ensure write permissions in target directory
+chmod -R u+w content/
+```
+
+### Performance Tips
+
+- **Use Apple Silicon**: MLX performs best on Apple Silicon Macs with Metal
+- **Frame interval**: Use larger intervals (2-5 seconds) for long videos
+- **Scene threshold**: Adjust based on video content (0.3-0.6 typical range)
+- **Memory**: Large videos may require significant RAM for frame extraction
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **MLX** - For the powerful vision-language models
+- **FFmpeg** - For robust video processing capabilities
+- **SequenceMatcher** - For semantic similarity detection
+
+---
+
+**Built with ❤️ for video analysis and AI-powered content understanding**
