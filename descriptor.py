@@ -109,14 +109,14 @@ def main():
     
     # Step 1: Extract frames
     print("\n1/5 - Extracting frames from videos...")
-    success = run_command(f"python3 frame-extractor.py {directory}", "Frame extraction")
+    success = run_command(f"python3 scripts/frame-extractor.py {directory}", "Frame extraction")
     if not success:
         print("Pipeline stopped due to frame extraction failure.")
         sys.exit(1)
     
     # Step 2: Extract scenes
     print("\n2/5 - Extracting scene changes from videos...")
-    success = run_command(f"python3 scene-extractor.py {directory}", "Scene extraction")
+    success = run_command(f"python3 scripts/scene-extractor.py {directory}", "Scene extraction")
     if not success:
         print("Warning: Scene extraction failed, but continuing pipeline...")
     
@@ -131,7 +131,7 @@ def main():
         descriptions_success = True
         for i, folder in enumerate(video_folders, 1):
             print(f"  Processing folder {i}/{len(video_folders)}: {folder.name}")
-            success = run_command(f"python3 describeAI.py {folder}", f"Description generation for {folder.name}")
+            success = run_command(f"python3 scripts/describeAI.py {folder}", f"Description generation for {folder.name}")
             if not success:
                 descriptions_success = False
                 print(f"  Warning: Failed to process {folder.name}")
@@ -142,7 +142,7 @@ def main():
     
     # Step 4: Group descriptions
     print("\n4/5 - Grouping similar descriptions...")
-    success = run_command(f"python3 des-group.py {directory}", "Description grouping")
+    success = run_command(f"python3 scripts/des-group.py {directory}", "Description grouping")
     if not success:
         print("Pipeline stopped due to description grouping failure.")
         sys.exit(1)
@@ -153,7 +153,7 @@ def main():
     print("  Deleting: frames folders and *.description.json files\n")
     
     # Run clear-files.py to delete frames and .description.json files, keeping .descriptions.json
-    success = run_command_silent(f"python3 clear-files.py {directory}", "Cleanup - removing frames folder, .description.json, .scene.json files")
+    success = run_command_silent(f"python3 scripts/clear-files.py {directory}", "Cleanup - removing frames folder, .description.json, .scene.json files")
     if not success:
         print("Warning: Failed to clean up .description.json files")
     

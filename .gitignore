@@ -1,5 +1,6 @@
 content/*
 venv/*
 test/*
+install/venv/*
 
 .DS_Store

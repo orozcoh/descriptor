@@ -1,13 +1,10 @@
-# 🎬 Descriptor - AI Video Description Pipeline
+# 🎬 Video Processing Pipeline
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Required-black.svg)](https://developer.apple.com/apple-silicon/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Required-orange.svg)](https://ffmpeg.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A sophisticated video processing pipeline that transforms raw video files into structured, AI-analyzed descriptions with scene detection and semantic grouping.
-
-⚠️ **Important**: This pipeline currently only works on **Apple Silicon Macs** due to MLX dependencies.
 
 ## ✨ Features
 
@@ -22,7 +19,30 @@ A sophisticated video processing pipeline that transforms raw video files into s
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Option 1: One-Command Installation (Recommended)
+
+Install descriptor system-wide with a single curl command:
+
+```bash
+curl -sSL https://github.com/orozcoh/descriptor/main/install/curl-install.sh | bash
+```
+
+After installation, use descriptor from any directory:
+
+```bash
+# Process current directory
+descriptor .
+
+# Process specific directory
+descriptor /path/to/videos
+
+# Show help
+descriptor --help
+```
+
+### Option 2: Manual Installation
+
+#### 1. Install Dependencies
 
 ```bash
 # Install Python dependencies
@@ -38,7 +58,7 @@ sudo apt install ffmpeg
 # Windows: Download from https://ffmpeg.org/download.html
 ```
 
-### 2. Run the Complete Pipeline
+#### 2. Run the Complete Pipeline
 
 ```bash
 # Process all videos in a directory
@@ -50,6 +70,23 @@ python3 descriptor.py .
 # Process with verbose output
 python3 descriptor.py path/to/folder --verbose
 ```
+
+### Option 3: Local Installation
+
+Clone the repository and run the installation script:
+
+```bash
+# Clone the repository
+git clone https://github.com/orozcoh/descriptor.git
+cd descriptor
+
+# Run installation script
+./install/install.sh
+```
+
+**Note**: The `./install/install.sh` script is designed for macOS on Apple Silicon (M1/M2/M3+). See manual installation for other platforms.
+
+After installation, the `descriptor` command will be available system-wide.
 
 ### 3. View Results
 
@@ -70,7 +107,7 @@ The pipeline generates structured JSON files with:
 
 ```bash
 # Clone or download the project
-git clone <repository-url>
+git clone https://github.com/orozcoh/descriptor.git
 cd descriptor
 
 # Create virtual environment (recommended)
@@ -82,6 +119,8 @@ pip install -r requirements.txt
 ```
 
 ### Dependencies
+
+Key MLX dependencies (see `install/requirements.txt` for the full list):
 
 ```txt
 mlx-lm==0.30.7      # MLX language model framework
@@ -103,13 +142,13 @@ python3 descriptor.py [directory_path] [options]
 **Examples:**
 ```bash
 # Process specific directory
-python3 descriptor.py path/to/folder
+python3 descriptor.py content/2026/26-week-1-2
 
 # Process current directory
 python3 descriptor.py .
 
 # Verbose output
-python3 descriptor.py path/to/folder --verbose
+python3 descriptor.py content/2026/26-week-1-2 --verbose
 ```
 
 **Pipeline Steps:**
@@ -128,7 +167,7 @@ python3 descriptor.py path/to/folder --verbose
 Extract frames from video files at specified intervals.
 
 ```bash
-python3 frame-extractor.py [directory] [options]
+python3 scripts/frame-extractor.py [directory] [options]
 ```
 
 **Options:**
@@ -138,13 +177,13 @@ python3 frame-extractor.py [directory] [options]
 **Examples:**
 ```bash
 # Extract frames every 1 second
-python3 frame-extractor.py path/to/folder
+python3 scripts/frame-extractor.py content/2026/26-week-1-2
 
 # Extract frames every 0.5 seconds
-python3 frame-extractor.py path/to/folder -i 0.5
+python3 scripts/frame-extractor.py content/2026/26-week-1-2 -i 0.5
 
 # Verbose output
-python3 frame-extractor.py path/to/folder -v
+python3 scripts/frame-extractor.py content/2026/26-week-1-2 -v
 ```
 
 **Output:** PNG frames in `frames/` subdirectory, scaled to 720p
@@ -156,7 +195,7 @@ python3 frame-extractor.py path/to/folder -v
 Detect scene changes in video files using FFmpeg.
 
 ```bash
-python3 scene-extractor.py [directory] [options]
+python3 scripts/scene-extractor.py [directory] [options]
 ```
 
 **Options:**
@@ -166,13 +205,13 @@ python3 scene-extractor.py [directory] [options]
 **Examples:**
 ```bash
 # Detect scenes with default threshold
-python3 scene-extractor.py path/to/folder
+python3 scripts/scene-extractor.py content/2026/26-week-1-2
 
 # Use custom threshold
-python3 scene-extractor.py path/to/folder -t 0.6
+python3 scripts/scene-extractor.py content/2026/26-week-1-2 -t 0.6
 
 # Verbose output
-python3 scene-extractor.py path/to/folder -v
+python3 scripts/scene-extractor.py content/2026/26-week-1-2 -v
 ```
 
 **Output:** `*.scene.json` files with scene change timestamps and scores
@@ -184,7 +223,7 @@ python3 scene-extractor.py path/to/folder -v
 Generate AI descriptions for video frames using MLX VLM.
 
 ```bash
-python3 describeAI.py [folder_path] [options]
+python3 scripts/describeAI.py [folder_path] [options]
 ```
 
 **Options:**
@@ -193,10 +232,10 @@ python3 describeAI.py [folder_path] [options]
 **Examples:**
 ```bash
 # Generate descriptions for frames in a folder
-python3 describeAI.py path/to/folder
+python3 scripts/describeAI.py content/2026/26-week-1-2
 
 # Verbose output
-python3 describeAI.py path/to/folder -v
+python3 scripts/describeAI.py content/2026/26-week-1-2 -v
 ```
 
 **Requirements:** Must be run in a folder containing a `frames/` directory
@@ -210,7 +249,7 @@ python3 describeAI.py path/to/folder -v
 Group similar consecutive descriptions into time ranges.
 
 ```bash
-python3 des-group.py [directory] [options]
+python3 scripts/des-group.py [directory] [options]
 ```
 
 **Options:**
@@ -220,13 +259,13 @@ python3 des-group.py [directory] [options]
 **Examples:**
 ```bash
 # Group descriptions with default threshold
-python3 des-group.py path/to/folder
+python3 scripts/des-group.py content/2026/26-week-1-2
 
 # Use custom similarity threshold
-python3 des-group.py path/to/folder --threshold 0.75
+python3 scripts/des-group.py content/2026/26-week-1-2 --threshold 0.75
 
 # Verbose output
-python3 des-group.py path/to/folder -v
+python3 scripts/des-group.py content/2026/26-week-1-2 -v
 ```
 
 **Requirements:** Requires both `*.description.json` and `*.scene.json` files
@@ -240,7 +279,7 @@ python3 des-group.py path/to/folder -v
 Remove temporary files created during processing.
 
 ```bash
-python3 clear-files.py [target] [options]
+python3 scripts/clear-files.py [target] [options]
 ```
 
 **Targets:**
@@ -256,16 +295,16 @@ python3 clear-files.py [target] [options]
 **Examples:**
 ```bash
 # Remove frames directories only
-python3 clear-files.py frames
+python3 scripts/clear-files.py frames
 
 # Remove all temporary files (with confirmation)
-python3 clear-files.py purge
+python3 scripts/clear-files.py purge
 
 # Remove descriptions in specific directory
-python3 clear-files.py description path/to/folder
+python3 scripts/clear-files.py description content/2026/26-week-1-2
 
 # Verbose output
-python3 clear-files.py purge -v
+python3 scripts/clear-files.py purge -v
 ```
 
 ## 🔄 Workflow Diagram
@@ -292,7 +331,7 @@ graph TD
 
 ```json
 {
-  "folder": "path/to/folder",
+  "folder": "content/2026/26-week-1-2",
   "videos": {
     "VID_20260224_123820": {
       "timestamps": [
@@ -347,7 +386,7 @@ graph TD
 
 ```json
 {
-  "video_file": "path/to/folder/video_file.mp4",
+  "video_file": "content/2026/26-week-1-2/VID_20260224_123820.mp4",
   "scene_threshold": 0.4,
   "total_scenes": 1,
   "scenes": [
