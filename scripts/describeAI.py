@@ -116,14 +116,6 @@ def main(folder_path: str, verbose: bool = False):
         sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
         sys.stdout.flush()
     
-    # Generate folder summary
-    summary = {"folder": folder.name, "videos": video_jsons}
-    summary_path = folder / f"{folder.name}.description.json"
-    with open(summary_path, 'w', encoding='utf-8') as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
-    if verbose:
-        print(f"\nFolder summary saved: {summary_path}")
-    
     end_time = time.perf_counter()
     total_time = end_time - start_time
     if verbose:

@@ -17,6 +17,7 @@ import json
 import argparse
 import time
 import sys
+import os
 from pathlib import Path
 from difflib import SequenceMatcher
 from typing import Dict, List, Tuple, Optional
@@ -153,8 +154,7 @@ def is_video_description_file(file_path: Path) -> bool:
     """
     Check if a file is an individual video description file (not a folder summary).
     
-    Folder summary files typically have the pattern "folder-name.description.json"
-    while individual video files have patterns like "VID_xxx.description.json"
+    Folder summary files have the pattern "folder-name.description.json"
     
     Args:
         file_path (Path): Path to the JSON file
@@ -163,8 +163,12 @@ def is_video_description_file(file_path: Path) -> bool:
         bool: True if it's an individual video description file, False if folder summary
     """
     filename = file_path.stem
-    # Folder summaries typically don't start with "VID_"
-    return filename.startswith("VID_")
+    folder_name = file_path.parent.name
+    # Skip folder summary files
+    if filename == f"{folder_name}.description":
+        return False
+    # Accept all other *.description.json files (individual videos)
+    return True
 
 
 def load_scene_data(video_path: Path) -> Optional[Dict]:
@@ -328,7 +332,7 @@ def create_folder_summary(folder: Path, video_jsons: dict):
     print(f"\nFolder summary saved: {summary_path}")
 
 
-def create_folder_descriptions_summary(folder: Path, grouped_descriptions: dict):
+def create_folder_descriptions_summary(folder: Path, grouped_descriptions: dict, verbose: bool = False):
     """
     Create a folder summary JSON file from grouped video descriptions.
     
@@ -340,7 +344,44 @@ def create_folder_descriptions_summary(folder: Path, grouped_descriptions: dict)
     summary_path = folder / f"{folder.name}.descriptions.json"
     with open(summary_path, 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
-    print(f"\nFolder descriptions summary saved: {summary_path}")
+    if verbose:
+        print(f"\nFolder descriptions summary saved: {summary_path}")
+
+
+def create_local_summaries(root_dir: Path, verbose: bool = False):
+    """
+    Create per-folder .descriptions.json summaries for folders containing individual video descriptions.
+    """
+    for root, dirs, files in os.walk(root_dir):
+        folder_path = Path(root)
+        folder_name = folder_path.name
+        
+        # Find local individual *.descriptions.json (exclude summaries)
+        summary_files = [
+            f for f in files 
+            if f.endswith('.descriptions.json') and f != f'{folder_name}.descriptions.json'
+        ]
+        
+        if summary_files:
+            local_grouped = {}
+            for sum_file in summary_files:
+                sum_path = folder_path / sum_file
+                video_stem = sum_file.replace('.descriptions.json', '')
+                try:
+                    with open(sum_path, 'r', encoding='utf-8') as f:
+                        local_grouped[video_stem] = json.load(f)
+                except Exception as e:
+                    if verbose:
+                        print(f"  Warning: Could not load {sum_file} for summary: {e}")
+            
+            if local_grouped:
+                summary_path = folder_path / f'{folder_name}.descriptions.json'
+                summary = {"folder": folder_name, "videos": local_grouped}
+                with open(summary_path, 'w', encoding='utf-8') as f:
+                    json.dump(summary, f, indent=2, ensure_ascii=False)
+                
+                if verbose:
+                    print(f"  Created local summary for {folder_path.name}: {summary_path.name} ({len(local_grouped)} videos)")
 
 
 def main():
@@ -403,7 +444,7 @@ def main():
     
     if not description_files:
         print(f"No individual video description files found in {input_dir}")
-        print("Make sure files follow the pattern: VID_*.description.json")
+        print("Make sure there are *.description.json files from describeAI.py")
         sys.exit(0)
     
     if args.verbose:
@@ -443,11 +484,16 @@ def main():
         sys.stdout.write('\r' + ' ' * 80 + '\r')  # Clear line
         sys.stdout.flush()
     
-    # Create folder summary if we have any successful processing
+    # Create top-level folder summary if we have any successful processing
     if processed_count > 0:
         if args.verbose:
-            print("Creating folder summary...")
-        create_folder_descriptions_summary(input_dir, grouped_descriptions)
+            print("Creating top-level summary...")
+        create_folder_descriptions_summary(input_dir, grouped_descriptions, args.verbose)
+        
+        # Create local summaries for all folders
+        if args.verbose:
+            print("Creating per-folder summaries...")
+        create_local_summaries(input_dir, args.verbose)
     
     # Calculate and display execution time
     end_time = time.perf_counter()

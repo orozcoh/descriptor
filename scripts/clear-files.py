@@ -230,6 +230,10 @@ def main():
         delete_descriptions_only = function == 'descriptions'
         delete_scenes = function == 'scenes' or function is None
         
+        # Preserve *.descriptions.json files - confirm and report
+        preserve_files = find_description_files(root_path, "*.descriptions.json")
+        print(f"Preserving {len(preserve_files)} *.descriptions.json file(s)")
+        
         if delete_frames:
             frames_dirs = find_frames_directories(root_path)
             if frames_dirs:
@@ -243,6 +247,8 @@ def main():
         
         if delete_descriptions:
             description_files = find_description_files(root_path, "*.description.json")
+            # Safeguard: explicitly exclude *.descriptions.json files
+            description_files = [f for f in description_files if not f.name.endswith('.descriptions.json')]
             if description_files:
                 if args.verbose:
                     print("Deleting .description.json files...")
